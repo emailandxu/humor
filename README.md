@@ -8,13 +8,13 @@ This is the official implementation for the ICCV 2021 paper. For more informatio
 
 Create and activate a virtual environment to work in, e.g. using Conda:
 ```
-conda create -n humor_env python=3.7
-conda activate humor_env
+conda create -n humor python=3.7
+conda activate humor
 ```
 
 Install CUDA and PyTorch 1.6. For CUDA 10.1, this would look like:
 ```
-conda install pytorch==1.6.0 torchvision==0.7.0 cudatoolkit=10.1 -c pytorch
+conda install pytorch=1.13.0 torchvision=0.14.0 -c pytorch
 ```
 
 Install the remaining requirements with pip:

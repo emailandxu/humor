@@ -19,7 +19,7 @@ from body_model.utils import SMPL_JOINTS, KEYPT_VERTS, smpl_to_openpose
 
 from fitting.fitting_utils import OP_IGNORE_JOINTS, parse_floor_plane, compute_cam2prior, OP_EDGE_LIST, log_cur_stats
 from fitting.fitting_loss import FittingLoss
-
+from models.humor_model import HumorModel
 
 LINE_SEARCH = 'strong_wolfe'
 J_BODY = len(SMPL_JOINTS)-1 # no root
@@ -83,7 +83,7 @@ class MotionOptimizer():
         # body shape
         self.betas = torch.zeros((B, num_betas)).to(device) # same shape for all steps
 
-        self.motion_prior = motion_prior
+        self.motion_prior:HumorModel = motion_prior
         self.init_motion_prior = init_motion_prior
         self.latent_motion = None
         if self.motion_prior is not None:
@@ -250,7 +250,7 @@ class MotionOptimizer():
                 log_cur_stats(stats_dict, loss, iter=i)
                 loss.backward()
                 return loss
-
+            # XNote: this is for root trans and orient optimization
             root_optim.step(closure)
 
         body_pose = self.latent2pose(self.latent_pose)
@@ -480,6 +480,31 @@ class MotionOptimizer():
         saved_contact_height_weight = self.fitting_loss.loss_weights['contact_height']
         saved_contact_vel_weight = self.fitting_loss.loss_weights['contact_vel']
         for i in range(num_iter[2]):
+            BREAK=False
+            if BREAK:
+                break
+            else:
+
+                body_pose = self.latent2pose(self.latent_pose)
+                rollout_joints = rollout_results = None
+
+                # rollout and reset self.smpl_params to rolled out results so that get_optim_result works
+                rollout_results, cam_rollout_results = self.rollout_latent_motion(self.trans,
+                                                                                    self.root_orient,
+                                                                                    body_pose,
+                                                                                    self.betas,
+                                                                                    prior_opt_params,
+                                                                                    self.latent_motion,
+                                                                                    fit_gender=fit_gender)
+                params = dict(
+                    betas=self.betas.clone().squeeze(0).detach().cpu().numpy(),
+                    trans = cam_rollout_results['trans'].clone().squeeze(0).detach().cpu().numpy(),
+                    root_orient = cam_rollout_results['root_orient'].clone().squeeze(0).detach().cpu().numpy(),
+                    pose_body = rollout_results['pose_body'].clone().squeeze(0).detach().cpu().numpy(),
+                )
+
+                np.savez(f"{res_out_path}/stage3-step-{i}.npz", **params)
+
             if self.stage3_tune_init_state and i >= self.stage3_tune_init_freeze_start and i < self.stage3_tune_init_freeze_end:
                 # freeze initial state
                 motion_optim = motion_optim_curr
